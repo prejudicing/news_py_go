@@ -29,11 +29,12 @@ import { useNewsStore } from '../store/modules/news'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import TabBar from '../components/TabBar.vue'
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 
 const newsStore = useNewsStore()
 const router = useRouter()
 const { t } = useI18n()
+onMounted(() => newsStore.getCategories())
 
 // 计算属性：显示的分类（只显示非"更多"分类）
 const displayCategories = computed(() => {

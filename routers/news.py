@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from config.db_conf import get_db
 from crud import news
 from crud import news_cache
+from schemas.base import NewsItemBase
 
 # 创建 APIRouter 实例
 # prefix 路由前缀（API 接口规范文档）
@@ -45,7 +46,7 @@ async def get_news_list(
         "code": 200,
         "message": "获取新闻列表成功",
         "data": {
-            "list": news_list,
+            "list": [NewsItemBase.model_validate(item).model_dump(mode="json", by_alias=True) for item in news_list],
             "total": total,
             "hasMore": has_more
         }

@@ -1,21 +1,9 @@
-/**
- * API配置文件
- * 包含API基础URL和AI问答功能所需的API参数
- */
-
-// API基础URL配置
+// 可使用 VITE_API_BASE_URL 指定其他后端地址。
 export const apiConfig = {
-  // 后端API基础URL
-  baseURL: 'http://127.0.0.1:8000',
+  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000',
 }
 
+// AI 凭据由后端管理，前端只访问本项目的接口。
 export const aiChatConfig = {
-  // OpenAI API地址
-  apiEndpoint: 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions',
-  
-  // API Key (由开发人员指定)
-  apiKey: 'sk-9c4d89982a6a4bd3b7494d94751fe81c',
-  
-  // 使用的模型
-  model: 'qwen3-max-preview'
+  apiEndpoint: `${apiConfig.baseURL}/api/ai/chat`,
 }

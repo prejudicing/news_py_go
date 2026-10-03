@@ -15,7 +15,6 @@
           v-for="(category, index) in displayCategories" 
           :key="category.id" 
           :title="getCategoryTranslation(category.name)"
-          @click="newsStore.changeCategory(category.id)"
         >
           <van-pull-refresh v-model="newsStore.refreshing" @refresh="onRefresh">
             <van-list
@@ -40,7 +39,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch, computed, onBeforeUnmount } from 'vue'
+import { ref, onMounted, watch, computed, onBeforeUnmount, nextTick } from 'vue'
 import { useNewsStore } from '../store/modules/news'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
@@ -75,12 +74,15 @@ watch(
   { immediate: true }
 )
 
-onMounted(() => {
+onMounted(async () => {
   // 获取新闻分类
-  newsStore.getCategories().then(() => {
-    // 获取新闻列表
-    newsStore.getNewsList()
-  })
+  await newsStore.getCategories()
+  await nextTick()
+  const categoryId = Number(route.query.categoryId) || newsStore.currentCategory
+  const index = displayCategories.value.findIndex(category => category.id === categoryId)
+  activeTab.value = index >= 0 ? index : 0
+  const category = displayCategories.value[index >= 0 ? index : 0]
+  if (category) newsStore.changeCategory(category.id)
   
   // 初始化位置
   setTimeout(updateTabsPosition, 300)
@@ -163,16 +165,6 @@ const handleScroll = () => {
   updateTabsPosition()
 }
 
-onMounted(() => {
-  newsStore.getNewsList()
-  
-  // 初始化位置
-  setTimeout(updateTabsPosition, 300)
-  
-  // 添加滚动事件监听
-  window.addEventListener('scroll', handleScroll)
-})
-
 // 组件销毁前移除事件监听
 onBeforeUnmount(() => {
   window.removeEventListener('scroll', handleScroll)
@@ -180,8 +172,8 @@ onBeforeUnmount(() => {
 
 // 监听分类变化
 watch(activeTab, (newVal) => {
-  const categoryId = newsStore.categories[newVal].id
-  newsStore.changeCategory(categoryId)
+  const category = displayCategories.value[newVal]
+  if (category) newsStore.changeCategory(category.id)
 })
 
 // 下拉刷新

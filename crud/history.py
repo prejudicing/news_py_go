@@ -44,11 +44,11 @@ async def get_history_list(db: AsyncSession, user_id: int, page: int = 1, page_s
     return rows, total
 
 
-async def delete_history(db: AsyncSession, user_id: int, news_id: int):
+async def delete_history(db: AsyncSession, user_id: int, history_id: int):
     """
     删除历史记录
     """
-    query = delete(History).where(History.user_id == user_id, History.news_id == news_id)
+    query = delete(History).where(History.user_id == user_id, History.id == history_id)
     result = await db.execute(query)
     await db.commit()
 

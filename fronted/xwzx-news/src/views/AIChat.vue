@@ -52,6 +52,7 @@ import { showToast } from 'vant';
 import * as marked from 'marked';
 import DOMPurify from 'dompurify';
 import { aiChatConfig } from '../config/api';
+import { useUserStore } from '../store/user';
 
 // 聊天消息
 const messages = ref([
@@ -60,11 +61,10 @@ const messages = ref([
 const userInput = ref('');
 const messagesContainer = ref(null);
 const isLoading = ref(false);
+const userStore = useUserStore();
 
 // 从配置文件获取API设置
 const apiEndpoint = ref(aiChatConfig.apiEndpoint);
-const apiKey = ref(aiChatConfig.apiKey);
-const model = ref(aiChatConfig.model);
 
 // 格式化消息内容（支持Markdown）
 const formatMessage = (content) => {
@@ -77,9 +77,8 @@ const formatMessage = (content) => {
 const sendMessage = async () => {
   if (!userInput.value.trim() || isLoading.value) return;
   
-  // 检查API设置
-  if (!apiKey.value || apiKey.value === 'your-api-key-here') {
-    showToast('API Key未配置，请联系管理员');
+  if (!userStore.isLogin || !userStore.token) {
+    showToast('请先登录后使用AI问答');
     return;
   }
   
@@ -121,19 +120,16 @@ const fetchAIResponse = async (userMessage) => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey.value}`,
-        'X-DashScope-SSE': 'enable' // 添加阿里云DashScope所需的SSE头
+        'Authorization': userStore.token,
       },
       body: JSON.stringify({
-        model: model.value,
         messages: allMessages,
-        stream: true
       })
     });
     
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
-      throw new Error(error.error?.message || `HTTP error! status: ${response.status}`);
+      throw new Error(error.message || error.error?.message || `HTTP error! status: ${response.status}`);
     }
     
     // 处理SSE流
@@ -157,6 +153,9 @@ const fetchAIResponse = async (userMessage) => {
         
         try {
           const json = JSON.parse(data);
+          if (json.error) {
+            throw new Error(json.error.message || 'AI响应中断，请稍后重试');
+          }
           // 适配阿里云DashScope的返回格式
           const content = json.choices?.[0]?.delta?.content || 
                          json.output?.text || 
@@ -169,6 +168,7 @@ const fetchAIResponse = async (userMessage) => {
             scrollToBottom();
           }
         } catch (e) {
+          if (!(e instanceof SyntaxError)) throw e;
           console.error('Error parsing SSE data:', e);
         }
       }

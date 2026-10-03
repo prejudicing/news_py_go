@@ -127,7 +127,11 @@ export const useHistoryStore = defineStore('history', {
       
       try {
         console.log('删除浏览历史API：开始请求', id);
-        const response = await axios.delete(`${apiConfig.baseURL}/api/history/delete/${id}`, { 
+        const historyId = this.history.find(item => item.id === id)?.historyId;
+        if (!historyId) {
+          return { success: false, message: '未找到浏览记录，请刷新列表后重试' };
+        }
+        const response = await axios.delete(`${apiConfig.baseURL}/api/history/delete/${historyId}`, {
           headers: { 
             Authorization: userStore.token 
           } 
