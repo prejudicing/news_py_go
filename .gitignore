@@ -26,3 +26,7 @@ env/
 # Generated cache files
 cache/__pycache__/
 
+# Frontend dependencies and build output
+fronted/**/node_modules/
+fronted/**/dist/
+
