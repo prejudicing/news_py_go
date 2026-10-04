@@ -1,12 +1,12 @@
 # Codex 项目交接
 
-更新时间：2026-10-03，Asia/Shanghai。本文用于新任务窗口恢复上下文；进程、端口和工作区状态以新窗口实查为准。
+更新时间：2026-10-04，Asia/Shanghai。本文用于新任务窗口恢复上下文；进程、端口和工作区状态以新窗口实查为准。
 
 ## 用户目标与工作要求
 
 - 项目原后端是 Python FastAPI，正在独立目录 `backend_go/` 中迁移为 Go，技术栈为 Gin、GORM、Redis。
 - Go 接口继续兼容现有 Vue 前端、MySQL 表结构、用户密码哈希和登录令牌。
-- 用户明确要求 Go 代码添加逐行中文注释，后续新增或修改 Go 代码也应保持这个要求。
+- Go 注释采用社区常见风格：说明职责、约束和非直观原因，不逐行复述代码。
 - 用户明确指出过“model 全放在一个文件，而且没有分层”。这已完成整改：模型各自独立，实际请求经过 handler、service、repository。
 - 使用中文沟通，直接完成明确需求并验证，避免只给计划或反复确认常规操作。
 - 上一轮分层改造已完成，没有已知阻塞项；后续功能由用户的新需求决定，不自行扩展成另一轮重写。
@@ -14,9 +14,9 @@
 ## 工作区与环境
 
 - 根目录：`D:\projects\news_py_go`；系统 Windows，终端 PowerShell。
-- Git 分支核对时为 `main`，最近提交为 `a50b0fb add frontend and project documentation`。
-- 当前大量改动未提交，`backend_go/` 整个目录仍未跟踪。新窗口必须先运行 `git status --short`，不要因未跟踪就重建或删除。
-- 根目录 `.env.example` 在此前已有删除状态；除非用户要求，不自行恢复。
+- Git 分支为 `main`；Go 迁移已在提交 `103426d feat: add layered Go backend migration` 推送到 `origin/main`。
+- 当前按领域拆分仓储和 Service、拆分 Handler、清理冗余注释的改造尚未提交。新窗口必须先运行 `git status --short`，保留这些改动。
+- 根目录 `.env.example` 的删除已包含在 `103426d`；除非用户要求，不自行恢复。
 - 已有 `.venv/`、前端 `node_modules/` 和 Go 构建产物；先核对可用性，避免重复安装。
 - 系统 Go 命令路径为 `C:\go1.25.0.windows-amd64\go\bin\go.exe`。系统版本为 1.25.0，模块声明 `go 1.26.0`，进入 `backend_go/` 后自动选择工具链；本次核对模块内为 Go 1.26.0。
 - 本次核对 Node 为 24.19.0，npm 为 11.17.0。
@@ -67,9 +67,9 @@ backend_go/
     favorite.go
     history.go
   internal/dto/               请求参数、验证标签和响应结构
-  internal/handler/           Gin 路由、参数绑定、认证中间件、响应和 SSE 转发
-  internal/service/           登录、缓存、收藏、历史、AI 等业务规则
-  internal/repository/        Store 接口、GORM 实现、SQL、行锁和错误转换
+  internal/handler/           路由、中间件、参数、响应和各领域 HTTP handler
+  internal/service/           按用户、新闻、收藏、历史、AI、健康检查拆分的业务服务
+  internal/repository/        按领域拆分的仓储接口、GORM 实现、SQL 和错误转换
   internal/cache/             Redis JSON 缓存和降级
   internal/server/            依赖装配及 HTTP 集成测试
 ```
@@ -77,12 +77,12 @@ backend_go/
 调用链：`handler → service → repository → MySQL`。Service 可使用 Redis 缓存封装。
 
 - Handler 不直接访问 GORM、Redis 或执行密码哈希操作。
-- Service 不引用 Gin、GORM 或 MySQL 驱动，通过 `repository.Store` 访问数据；业务层决定事务边界，仓储执行实际事务。
+- Service 不引用 Gin、GORM 或 MySQL 驱动；每个领域服务只依赖对应的最小仓储接口。业务层决定事务边界，仓储执行实际事务。
 - Repository 负责持久化和数据库错误转换，向上暴露 `ErrNotFound`、`ErrDuplicate`、`ErrRelation`。
 - DTO 与数据库 model 分开；SQL 联表查询结构留在 repository。
-- `server.New(db, cache, cfg)` 保持装配入口，实例持有 `Service`，`Router()` 委托 handler 注册路由。
+- `server.New(db, cache, cfg)` 保持装配入口，实例持有按领域拆分的 `Services`，`Router()` 委托 handler 注册路由。
 - 已移除旧 `internal/server/users.go`、`news.go`、`collections.go`、`ai.go`，不要重新放回单体控制器实现。
-- 本次共有 37 个 Go 文件，全部非空代码行已有前置中文注释，包括测试；注释补全后用 Go 扫描器确认代码 token 未改变。
+- Handler 公共职责已拆到 `router.go`、`middleware.go`、`params.go`、`response.go` 和 `health.go`；注释已清理为 Go 常见的职责与原因说明。
 
 ## 当前服务快照
 
@@ -90,7 +90,7 @@ backend_go/
 
 | 服务 | 地址 | 核对结果 | 当时 PID |
 | --- | --- | --- | --- |
-| Go 后端 | http://127.0.0.1:8001 | `/health` 返回 200，MySQL `ok`、Redis `true` | 36668 |
+| Go 后端 | http://127.0.0.1:8001 | `/health` 返回 200，MySQL `ok`、Redis `true` | 9236 |
 | Vue 开发服务 | http://127.0.0.1:5173 | HTTP 200 | 15100 |
 | Python 后端 | http://127.0.0.1:8000 | 端口在监听，此次未重测全部接口 | 38292 |
 
@@ -174,7 +174,7 @@ Set-Location D:\projects\news_py_go
 ## 新窗口建议读取顺序
 
 1. 本文、根目录 `README.md`、`backend_go/README.md`，然后查看 `git status --short`。
-2. `backend_go/cmd/server/main.go`、`internal/server/server.go`、`internal/handler/handler.go`，了解实际依赖和路由。
+2. `backend_go/cmd/server/main.go`、`internal/server/server.go`、`internal/handler/router.go` 和 `internal/service/service.go`，了解依赖装配和路由。
 3. 根据新需求阅读对应的 dto、model、handler、service、repository 及测试，不必重新逐一实现所有模块。
 4. 接口与表结构参考 `docs/01-接口规范文档/API接口规范文档.md`、`docs/02-数据库sql文件/database.sql`、`docs/项目后端设计说明文档.md`；同时核对前端实际调用，文档与实现冲突时不要凭猜测改接口。
 5. 核对端口、进程、健康检查和前端实际 API 地址，再依据用户的新需求继续。
@@ -186,7 +186,7 @@ Set-Location D:\projects\news_py_go
 ```text
 请接手 D:\projects\news_py_go 项目。先阅读根目录 codex.md、README.md 和 backend_go/README.md，再检查 Git 工作区及实际运行状态。
 
-我们已把 FastAPI 后端迁移到 backend_go，使用 Gin、GORM、Redis，完成 handler → service → repository 分层、独立 model 文件和 dto，Go 代码有逐行中文注释。继续开发时保持这些要求，并兼容现有 Vue 前端、数据库表、密码哈希和令牌。
+我们已把 FastAPI 后端迁移到 backend_go，使用 Gin、GORM、Redis，完成 handler → service → repository 分层、独立 model 文件和 dto；业务服务与仓储接口已按领域拆分。Go 注释说明职责和非直观原因，不逐行复述代码。继续开发时保持这些要求，并兼容现有 Vue 前端、数据库表、密码哈希和令牌。
 
 保留所有未提交和未跟踪的改动，不要重复搭建已完成模块或恢复已删除的旧单体实现。配置从现有 .env 读取，不输出密钥。管理服务前核对 PID 和可执行路径。
 

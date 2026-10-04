@@ -75,16 +75,16 @@ cmd/server/         服务入口、连接初始化和退出处理
 internal/config/    环境配置和 MySQL DSN
 internal/model/     每张表独立一个模型文件
 internal/dto/       HTTP 请求参数和响应结构
-internal/handler/   Gin 路由、参数绑定、认证中间件和响应
-internal/service/   登录、缓存、收藏、历史、AI 等业务逻辑
-internal/repository/ 仓储接口、GORM 查询和数据库错误转换
+internal/handler/   按路由、中间件、参数和响应拆分的 HTTP 适配层
+internal/service/   用户、新闻、收藏、历史、AI 和健康检查领域服务
+internal/repository/ 按领域拆分的仓储接口、GORM 实现和错误转换
 internal/cache/     Redis JSON 缓存及降级
 internal/server/    组装依赖和接口集成测试
 ```
 
-请求调用顺序为 `handler → service → repository → MySQL`。Service 通过仓储接口访问数据，并在业务层控制登录和历史更新的事务；仓储层负责实际事务执行、行锁和 SQL。Handler 不直接操作 GORM 或 Redis，Service 不引用 Gin 或 GORM。
+请求调用顺序为 `handler → service → repository → MySQL`。业务服务拆分为 `UserService`、`NewsService`、`FavoriteService`、`HistoryService`、`AIService` 和 `HealthService`，每个服务只依赖对应的领域仓储接口。登录与历史更新分别使用各自的事务入口；仓储实现负责事务执行、行锁和 SQL。Handler 不直接操作 GORM 或 Redis，Service 不引用 Gin 或 GORM。
 
-模型分为 `user.go`、`user_token.go`、`category.go`、`news.go`、`favorite.go` 和 `history.go`。DTO 单独定义前端字段，数据库模型不再同时承担接口响应职责。新增和迁移的 Go 代码继续保留逐行中文注释。
+模型分为 `user.go`、`user_token.go`、`category.go`、`news.go`、`favorite.go` 和 `history.go`。DTO 单独定义前端字段，数据库模型不再同时承担接口响应职责。注释用于说明职责、约束和非直观设计原因，不再逐行复述代码。
 
 ## 测试
 
