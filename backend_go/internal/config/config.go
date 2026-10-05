@@ -18,6 +18,9 @@ type Config struct {
 	RedisDB                                                      int
 	Location                                                     *time.Location
 	AIKey, AIEndpoint, AIModel                                   string
+	JWTSecret                                                    string
+	FrontendOrigin                                               string
+	CookieSecure                                                 bool
 }
 
 // 加载环境配置并检查时区和 Redis 数据库编号。
@@ -41,6 +44,14 @@ func Load() (Config, error) {
 	if err != nil || redisDB < 0 {
 		return Config{}, fmt.Errorf("REDIS_DB must be a non-negative integer")
 	}
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if len(jwtSecret) < 32 || jwtSecret == "replace-with-a-random-secret-of-at-least-32-bytes" {
+		return Config{}, fmt.Errorf("JWT_SECRET must contain at least 32 bytes of secret data")
+	}
+	cookieSecure, err := strconv.ParseBool(env("COOKIE_SECURE", "false"))
+	if err != nil {
+		return Config{}, fmt.Errorf("COOKIE_SECURE must be true or false")
+	}
 	return Config{
 		Address: env("GO_HTTP_ADDR", "127.0.0.1:8001"),
 		DBHost:  env("DB_HOST", "127.0.0.1"), DBPort: env("DB_PORT", "3306"),
@@ -49,7 +60,10 @@ func Load() (Config, error) {
 		RedisAddress: net.JoinHostPort(env("REDIS_HOST", "127.0.0.1"), env("REDIS_PORT", "6379")),
 		RedisDB:      redisDB, RedisPassword: os.Getenv("REDIS_PASSWORD"), CachePrefix: env("GO_CACHE_PREFIX", "go:news:"),
 		AIKey: os.Getenv("AI_API_KEY"), AIModel: env("AI_MODEL", "qwen3-max-preview"),
-		AIEndpoint: env("AI_API_ENDPOINT", "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"),
+		AIEndpoint:     env("AI_API_ENDPOINT", "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"),
+		JWTSecret:      jwtSecret,
+		FrontendOrigin: env("FRONTEND_ORIGIN", "http://127.0.0.1:5173"),
+		CookieSecure:   cookieSecure,
 	}, nil
 }
 

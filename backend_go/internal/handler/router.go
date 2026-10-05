@@ -5,7 +5,7 @@ import "github.com/gin-gonic/gin"
 // Router 注册中间件和所有 HTTP 路由。
 func (h *Handler) Router() *gin.Engine {
 	r := gin.New()
-	r.Use(gin.Logger(), gin.CustomRecovery(func(c *gin.Context, _ any) { fail(c, 500, "服务器内部错误") }), cors())
+	r.Use(gin.Logger(), gin.CustomRecovery(func(c *gin.Context, _ any) { fail(c, 500, "服务器内部错误") }), h.cors())
 	_ = r.SetTrustedProxies(nil)
 	r.HandleMethodNotAllowed = true
 	r.GET("/", func(c *gin.Context) { c.JSON(200, gin.H{"message": "Hello World"}) })
@@ -21,6 +21,8 @@ func (h *Handler) Router() *gin.Engine {
 	users := r.Group("/api/user")
 	users.POST("/register", h.register)
 	users.POST("/login", h.login)
+	users.POST("/refresh", h.refresh)
+	users.POST("/logout", h.logout)
 	users.GET("/info", h.auth(), h.userInfo)
 	users.PUT("/update", h.auth(), h.updateUser)
 	users.PUT("/password", h.auth(), h.changePassword)

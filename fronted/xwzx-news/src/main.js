@@ -2,6 +2,8 @@ import { createApp } from 'vue'
 import App from './App.vue'
 import router from './router'
 import pinia from './store'
+import { installAuthInterceptors, restoreSession } from './api/auth'
+import { useUserStore } from './store/user'
 
 // 导入Vant组件库
 import { 
@@ -65,6 +67,9 @@ app.use(Popup)
 // 使用路由和状态管理
 app.use(router)
 app.use(pinia)
+
+installAuthInterceptors(pinia)
+void restoreSession(useUserStore(pinia))
 
 app.mount('#app')
 

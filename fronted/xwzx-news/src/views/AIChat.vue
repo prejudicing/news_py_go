@@ -53,6 +53,7 @@ import * as marked from 'marked';
 import DOMPurify from 'dompurify';
 import { aiChatConfig } from '../config/api';
 import { useUserStore } from '../store/user';
+import { fetchWithAuth } from '../api/auth';
 
 // 聊天消息
 const messages = ref([
@@ -116,11 +117,10 @@ const fetchAIResponse = async (userMessage) => {
     .map(msg => ({ role: msg.role, content: msg.content }));
   
   try {
-    const response = await fetch(apiEndpoint.value, {
+    const response = await fetchWithAuth(apiEndpoint.value, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': userStore.token,
       },
       body: JSON.stringify({
         messages: allMessages,

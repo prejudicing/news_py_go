@@ -5,7 +5,7 @@
 ## 用户目标与工作要求
 
 - 项目原后端是 Python FastAPI，正在独立目录 `backend_go/` 中迁移为 Go，技术栈为 Gin、GORM、Redis。
-- Go 接口继续兼容现有 Vue 前端、MySQL 表结构、用户密码哈希和登录令牌。
+- Go 接口继续兼容现有 Vue 前端；认证改用短时效 Access JWT 本地验签和独立 Refresh Session 轮换表。部署需执行破坏式迁移删除旧 `user_token`，旧令牌不再兼容，用户必须重新登录。
 - Go 注释采用社区常见风格：说明职责、约束和非直观原因，不逐行复述代码。
 - 用户明确指出过“model 全放在一个文件，而且没有分层”。这已完成整改：模型各自独立，实际请求经过 handler、service、repository。
 - 使用中文沟通，直接完成明确需求并验证，避免只给计划或反复确认常规操作。
@@ -14,8 +14,8 @@
 ## 工作区与环境
 
 - 根目录：`D:\projects\news_py_go`；系统 Windows，终端 PowerShell。
-- Git 分支为 `main`；Go 迁移已在提交 `103426d feat: add layered Go backend migration` 推送到 `origin/main`。
-- 当前按领域拆分仓储和 Service、拆分 Handler、清理冗余注释的改造尚未提交。新窗口必须先运行 `git status --short`，保留这些改动。
+- Git 分支为 `main`；分层迁移和按领域拆分已推送到 `origin/main`，当前最新已知提交为 `8069a45 refactor: split Go services and repositories`。
+- 当前 JWT 迁移改动尚未提交。新窗口必须先运行 `git status --short`，保留这些改动。
 - 根目录 `.env.example` 的删除已包含在 `103426d`；除非用户要求，不自行恢复。
 - 已有 `.venv/`、前端 `node_modules/` 和 Go 构建产物；先核对可用性，避免重复安装。
 - 系统 Go 命令路径为 `C:\go1.25.0.windows-amd64\go\bin\go.exe`。系统版本为 1.25.0，模块声明 `go 1.26.0`，进入 `backend_go/` 后自动选择工具链；本次核对模块内为 Go 1.26.0。
@@ -44,8 +44,7 @@ Go 模块：`github.com/prejudicing/news_py_go/backend_go`。
 - 普通 JSON 接口使用 `{code, message, data}`，首页例外；详情等响应字段兼容当前前端。
 - 新闻查询参数使用 `categoryId`、`page`、`pageSize`；收藏和历史添加使用 JSON `newsId`。
 - 时间字段使用 `publishTime`、`favoriteTime`、`viewTime`。
-- 认证支持原有裸令牌和 `Bearer <token>`，沿用数据库 `user_token`。
-- 登录事务锁定用户、删除旧令牌、签发新令牌，有效期 7 天；兼容 Python bcrypt 哈希及旧长密码截断行为。
+- 认证支持裸 JWT 和 `Bearer <token>` 请求头；15 分钟 HS256 Access JWT 只在进程内验签，普通 API 请求不查 SQL。Refresh Token 经 HttpOnly Cookie 传输，以哈希写入 `refresh_sessions`，7 天空闲过期、30 天绝对过期；保留轮换链并检测重放，重放会撤销会话族。改密撤销全部会话，退出撤销当前会话族。数据库升级需执行 `docs/02-数据库sql文件/migrations/001_refresh_sessions.sql`，删除旧 `user_token` 并要求重新登录。兼容 bcrypt 密码哈希。启动前必须配置至少 32 字节的 `JWT_SECRET`，不得输出其值。
 - 新闻详情即使命中缓存，每次浏览仍递增数据库浏览量。
 - 相关新闻按新闻所属分类查询并排除当前新闻，已有回归断言防止新闻 ID 与分类 ID 参数颠倒。
 - 重复浏览同一新闻更新已有历史，保持历史记录 ID；删除始终限定当前用户。
@@ -61,7 +60,7 @@ backend_go/
   internal/config/            环境配置、时区、MySQL DSN
   internal/model/             数据库实体，每个模型独立文件
     user.go
-    user_token.go
+    refresh_session.go
     category.go
     news.go
     favorite.go
@@ -71,6 +70,7 @@ backend_go/
   internal/service/           按用户、新闻、收藏、历史、AI、健康检查拆分的业务服务
   internal/repository/        按领域拆分的仓储接口、GORM 实现、SQL 和错误转换
   internal/cache/             Redis JSON 缓存和降级
+  internal/utils/             JWT 签发与校验
   internal/server/            依赖装配及 HTTP 集成测试
 ```
 

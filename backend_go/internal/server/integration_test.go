@@ -19,6 +19,7 @@ import (
 	"github.com/prejudicing/news_py_go/backend_go/internal/config"
 	"github.com/prejudicing/news_py_go/backend_go/internal/dto"
 	"github.com/prejudicing/news_py_go/backend_go/internal/model"
+	"github.com/prejudicing/news_py_go/backend_go/internal/utils"
 	"github.com/redis/go-redis/v9"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
@@ -27,19 +28,24 @@ import (
 
 // 封装集成测试的请求发送与响应断言。
 type testAPI struct {
-	t      *testing.T
-	router http.Handler
-	token  string
+	t             *testing.T
+	router        http.Handler
+	token         string
+	refreshCookie string
+	lastCookie    *http.Cookie
 }
 
 // 发送测试请求并检查 HTTP 状态与响应格式。
-func (a testAPI) request(method, path string, data any, status int) map[string]any {
+func (a *testAPI) request(method, path string, data any, status int) map[string]any {
 	a.t.Helper()
 	body, _ := json.Marshal(data)
 	req := httptest.NewRequest(method, path, bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	if a.token != "" {
 		req.Header.Set("Authorization", a.token)
+	}
+	if a.refreshCookie != "" {
+		req.AddCookie(&http.Cookie{Name: "refresh_token", Value: a.refreshCookie})
 	}
 	w := httptest.NewRecorder()
 	a.router.ServeHTTP(w, req)
@@ -53,18 +59,29 @@ func (a testAPI) request(method, path string, data any, status int) map[string]a
 	if result["code"] != float64(status) {
 		a.t.Fatal("response envelope mismatch")
 	}
+	for _, cookie := range w.Result().Cookies() {
+		if cookie.Name == "refresh_token" {
+			a.lastCookie = cookie
+			if cookie.MaxAge < 0 {
+				a.refreshCookie = ""
+			} else {
+				a.refreshCookie = cookie.Value
+			}
+		}
+	}
 	if value, valid := result["data"].(map[string]any); valid {
 		return value
 	}
 	return result
 }
 
-// 使用隔离的 MySQL 测试库验证完整业务和旧数据兼容性。
+// 使用隔离的 MySQL 测试库验证完整业务和刷新会话轮换。
 func TestMySQLIntegration(t *testing.T) {
 	if os.Getenv("GO_INTEGRATION_TEST") != "1" {
 		t.Skip("set GO_INTEGRATION_TEST=1 and ENV_FILE to enable isolated MySQL tests")
 	}
 	gin.SetMode(gin.TestMode)
+	t.Setenv("JWT_SECRET", "integration-test-signing-secret-with-32-bytes")
 	cfg, err := config.Load()
 	if err != nil {
 		t.Fatal(err)
@@ -113,6 +130,25 @@ func TestMySQLIntegration(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	if err := db.Exec("CREATE TABLE user_token (id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY, token VARCHAR(255) NOT NULL)").Error; err != nil {
+		t.Fatal(err)
+	}
+	migration, err := os.ReadFile("../../../docs/02-数据库sql文件/migrations/001_refresh_sessions.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	migrationStatements := regexp.MustCompile("(?s)CREATE TABLE IF NOT EXISTS `refresh_sessions`.*?;|DROP TABLE IF EXISTS `user_token`;").FindAllString(string(migration), -1)
+	if len(migrationStatements) != 2 {
+		t.Fatal("unexpected refresh-session migration")
+	}
+	for _, statement := range migrationStatements {
+		if err := db.Exec(statement).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	if !db.Migrator().HasTable(&model.RefreshSession{}) || db.Migrator().HasTable("user_token") {
+		t.Fatal("refresh-session migration did not replace the legacy token table")
+	}
 	category := model.Category{ID: 1, Name: "头条", SortOrder: 1}
 	if err := db.Create(&category).Error; err != nil {
 		t.Fatal(err)
@@ -131,42 +167,53 @@ func TestMySQLIntegration(t *testing.T) {
 	api := testAPI{t: t, router: app.Router()}
 	creds := map[string]string{"username": "go-test-user", "password": "test-password"}
 
-	t.Run("registration_login_and_token_rotation", func(t *testing.T) {
+	t.Run("registration_login_and_refresh_reuse_detection", func(t *testing.T) {
 		api.t = t
 		data := api.request("POST", "/api/user/register", creds, 200)
 		api.token = data["token"].(string)
+		if api.refreshCookie == "" || api.lastCookie == nil || !api.lastCookie.HttpOnly || api.lastCookie.SameSite != http.SameSiteStrictMode {
+			t.Fatal("refresh credential cookie flags are missing")
+		}
+		if _, err := utils.ParseJWT(api.token, []byte(cfg.JWTSecret)); err != nil {
+			t.Fatal("registration did not issue a valid JWT")
+		}
 		if strings.Contains(fmt.Sprint(data), "password") {
 			t.Fatal("password exposed")
 		}
 		api.request("POST", "/api/user/register", creds, 400)
 		api.request("POST", "/api/user/login", map[string]string{"username": "go-test-user", "password": "wrong"}, 401)
-		newToken := api.request("POST", "/api/user/login", creds, 200)["token"].(string)
+		login := api.request("POST", "/api/user/login", creds, 200)
+		newToken := login["token"].(string)
+		api.token = ""
 		api.request("GET", "/api/user/info", nil, 401)
+		tampered := testAPI{t: t, router: api.router, token: newToken + "x"}
+		tampered.request("GET", "/api/user/info", nil, 401)
 		api.token = "Bearer " + newToken
 		info := api.request("GET", "/api/user/info", nil, 200)
 		if info["username"] != creds["username"] {
 			t.Fatal("incorrect user")
 		}
+		api.token = newToken
+		oldRefresh := api.refreshCookie
+		refreshed := api.request("POST", "/api/user/refresh", nil, 200)
+		if refreshed["token"] == newToken || api.refreshCookie == oldRefresh {
+			t.Fatal("refresh did not rotate the access and refresh credentials")
+		}
+		rotatedRefresh := api.refreshCookie
+		api.refreshCookie = oldRefresh
+		api.request("POST", "/api/user/refresh", nil, 401)
+		api.refreshCookie = rotatedRefresh
+		api.request("POST", "/api/user/refresh", nil, 401)
 	})
-	t.Run("python_bcrypt_and_existing_token_compatibility", func(t *testing.T) {
-		u := model.User{Username: "legacy-user", Password: "$2b$12$.Nujxqtcickr7smb1OWO/.aZlZTSZ1z2O4KnRJ8AXmJXDlOzM6ZIG"}
+	t.Run("password_hash_login", func(t *testing.T) {
+		u := model.User{Username: "existing-user", Password: "$2b$12$.Nujxqtcickr7smb1OWO/.aZlZTSZ1z2O4KnRJ8AXmJXDlOzM6ZIG"}
 		if err := db.Create(&u).Error; err != nil {
 			t.Fatal(err)
 		}
-		old := model.UserToken{UserID: u.ID, Token: "python-existing-token", ExpiresAt: time.Now().In(cfg.Location).Add(time.Hour)}
-		if err := db.Create(&old).Error; err != nil {
-			t.Fatal(err)
-		}
-		legacyAPI := testAPI{t: t, router: api.router, token: old.Token}
-		legacyAPI.request("GET", "/api/user/info", nil, 200)
-		legacyAPI.request("POST", "/api/user/login", map[string]string{"username": u.Username, "password": "legacy-password"}, 200)
-		legacyAPI.request("GET", "/api/user/info", nil, 401)
-		expired := model.UserToken{UserID: u.ID, Token: "expired-python-token", ExpiresAt: time.Now().In(cfg.Location).Add(-time.Hour)}
-		if err := db.Create(&expired).Error; err != nil {
-			t.Fatal(err)
-		}
-		legacyAPI.token = expired.Token
-		legacyAPI.request("GET", "/api/user/info", nil, 401)
+		passwordAPI := &testAPI{t: t, router: api.router}
+		login := passwordAPI.request("POST", "/api/user/login", map[string]string{"username": u.Username, "password": "legacy-password"}, 200)
+		passwordAPI.token = login["token"].(string)
+		passwordAPI.request("GET", "/api/user/info", nil, 200)
 	})
 	t.Run("profile_and_password", func(t *testing.T) {
 		api.t = t

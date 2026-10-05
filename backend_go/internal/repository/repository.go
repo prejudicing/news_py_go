@@ -29,11 +29,14 @@ type UserRepository interface {
 	WithUserTransaction(context.Context, func(UserRepository) error) error
 	UserByID(context.Context, uint64, bool) (model.User, error)
 	UserByUsername(context.Context, string) (model.User, error)
-	UserByToken(context.Context, string, time.Time) (model.User, error)
+	RefreshSessionByHash(context.Context, string, bool) (model.RefreshSession, error)
 	CreateUser(context.Context, *model.User) error
 	UpdateUser(context.Context, uint64, map[string]any) error
-	DeleteTokens(context.Context, uint64) error
-	CreateToken(context.Context, *model.UserToken) error
+	CreateRefreshSession(context.Context, *model.RefreshSession) error
+	RotateRefreshSession(context.Context, uint64, time.Time, string) error
+	RevokeRefreshFamily(context.Context, string, time.Time) error
+	RevokeAllRefreshSessions(context.Context, uint64, time.Time) error
+	PruneExpiredRefreshSessions(context.Context, time.Time) error
 }
 
 // NewsRepository 提供新闻查询和浏览量更新能力。

@@ -21,22 +21,29 @@ CREATE TABLE IF NOT EXISTS `user` (
   UNIQUE INDEX `phone_UNIQUE` (`phone` ASC)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户信息表';
 
--- 用户令牌表
-CREATE TABLE IF NOT EXISTS `user_token` (
-  `id` INT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '令牌ID',
+-- Refresh 会话表：只存令牌摘要，并保留轮换链用于检测重放。
+CREATE TABLE IF NOT EXISTS `refresh_sessions` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '刷新凭据记录ID',
   `user_id` INT UNSIGNED NOT NULL COMMENT '用户ID',
-  `token` VARCHAR(255) NOT NULL COMMENT '令牌值',
-  `expires_at` TIMESTAMP NOT NULL COMMENT '过期时间',
+  `family_id` CHAR(32) CHARACTER SET ascii COLLATE ascii_bin NOT NULL COMMENT '会话族标识',
+  `token_hash` CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL COMMENT 'Refresh Token SHA-256 摘要',
+  `expires_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '当前凭据空闲过期时间',
+  `family_expires_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '会话族绝对过期时间',
+  `revoked_at` TIMESTAMP NULL DEFAULT NULL COMMENT '撤销或轮换时间',
+  `replaced_by_hash` CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NULL DEFAULT NULL COMMENT '后继凭据摘要',
   `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   PRIMARY KEY (`id`),
-  UNIQUE INDEX `token_UNIQUE` (`token` ASC),
-  INDEX `fk_user_token_user_idx` (`user_id` ASC),
-  CONSTRAINT `fk_user_token_user`
+  UNIQUE INDEX `uidx_refresh_sessions_token_hash` (`token_hash`),
+  INDEX `idx_refresh_sessions_user` (`user_id`),
+  INDEX `idx_refresh_sessions_family` (`family_id`),
+  INDEX `idx_refresh_sessions_expiry` (`expires_at`),
+  INDEX `idx_refresh_sessions_family_expiry` (`family_expires_at`),
+  CONSTRAINT `fk_refresh_sessions_user`
     FOREIGN KEY (`user_id`)
     REFERENCES `user` (`id`)
     ON DELETE CASCADE
     ON UPDATE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户令牌表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='刷新令牌会话与轮换记录';
 
 -- 新闻分类表
 CREATE TABLE IF NOT EXISTS `news_category` (

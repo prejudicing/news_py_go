@@ -1,6 +1,8 @@
 package config
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -17,5 +19,23 @@ func TestDSNPreservesSpecialPasswordAndTimezone(t *testing.T) {
 	}
 	if parsed.Passwd != c.DBPassword || !parsed.ParseTime || parsed.Loc.String() != "Asia/Shanghai" {
 		t.Fatal("DSN lost password or time settings")
+	}
+}
+
+func TestLoadRequiresJWTSecret(t *testing.T) {
+	configFile := filepath.Join(t.TempDir(), "empty.env")
+	if err := os.WriteFile(configFile, nil, 0600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("ENV_FILE", configFile)
+	for _, secret := range []string{"", "short", "replace-with-a-random-secret-of-at-least-32-bytes"} {
+		t.Setenv("JWT_SECRET", secret)
+		if _, err := Load(); err == nil {
+			t.Fatal("invalid JWT signing secret accepted")
+		}
+	}
+	t.Setenv("JWT_SECRET", "local-test-secret-with-at-least-32-bytes")
+	if _, err := Load(); err != nil {
+		t.Fatal(err)
 	}
 }

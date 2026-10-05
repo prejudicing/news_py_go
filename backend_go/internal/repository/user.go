@@ -27,13 +27,14 @@ func (r *GORMStore) UserByUsername(ctx context.Context, name string) (model.User
 	return user, translate(err)
 }
 
-// 关联令牌表查询尚未过期的用户。
-func (r *GORMStore) UserByToken(ctx context.Context, token string, now time.Time) (model.User, error) {
-	var user model.User
-	err := r.db.WithContext(ctx).Table("user").Select("user.*").
-		Joins("JOIN user_token ON user_token.user_id = user.id").
-		Where("user_token.token = ? AND user_token.expires_at > ?", token, now).Take(&user).Error
-	return user, translate(err)
+func (r *GORMStore) RefreshSessionByHash(ctx context.Context, tokenHash string, lock bool) (model.RefreshSession, error) {
+	var session model.RefreshSession
+	query := r.db.WithContext(ctx).Where("token_hash = ?", tokenHash)
+	if lock {
+		query = query.Clauses(clause.Locking{Strength: "UPDATE"})
+	}
+	err := query.Take(&session).Error
+	return session, translate(err)
 }
 
 // 写入新用户实体。
@@ -46,12 +47,33 @@ func (r *GORMStore) UpdateUser(ctx context.Context, id uint64, fields map[string
 	return translate(r.db.WithContext(ctx).Model(&model.User{}).Where("id = ?", id).Updates(fields).Error)
 }
 
-// 删除该用户的旧令牌。
-func (r *GORMStore) DeleteTokens(ctx context.Context, id uint64) error {
-	return translate(r.db.WithContext(ctx).Where("user_id = ?", id).Delete(&model.UserToken{}).Error)
+func (r *GORMStore) CreateRefreshSession(ctx context.Context, session *model.RefreshSession) error {
+	return translate(r.db.WithContext(ctx).Create(session).Error)
 }
 
-// 写入新的登录令牌。
-func (r *GORMStore) CreateToken(ctx context.Context, token *model.UserToken) error {
-	return translate(r.db.WithContext(ctx).Create(token).Error)
+func (r *GORMStore) RotateRefreshSession(ctx context.Context, id uint64, now time.Time, replacementHash string) error {
+	result := r.db.WithContext(ctx).Model(&model.RefreshSession{}).
+		Where("id = ? AND revoked_at IS NULL AND expires_at > ? AND family_expires_at > ?", id, now, now).
+		Updates(map[string]any{"revoked_at": now, "replaced_by_hash": replacementHash})
+	if result.Error != nil {
+		return translate(result.Error)
+	}
+	if result.RowsAffected != 1 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+func (r *GORMStore) RevokeRefreshFamily(ctx context.Context, familyID string, now time.Time) error {
+	return translate(r.db.WithContext(ctx).Model(&model.RefreshSession{}).
+		Where("family_id = ? AND revoked_at IS NULL", familyID).Update("revoked_at", now).Error)
+}
+
+func (r *GORMStore) RevokeAllRefreshSessions(ctx context.Context, userID uint64, now time.Time) error {
+	return translate(r.db.WithContext(ctx).Model(&model.RefreshSession{}).
+		Where("user_id = ? AND revoked_at IS NULL", userID).Update("revoked_at", now).Error)
+}
+
+func (r *GORMStore) PruneExpiredRefreshSessions(ctx context.Context, now time.Time) error {
+	return translate(r.db.WithContext(ctx).Where("family_expires_at <= ?", now).Delete(&model.RefreshSession{}).Error)
 }

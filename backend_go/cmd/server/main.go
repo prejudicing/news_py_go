@@ -13,6 +13,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/prejudicing/news_py_go/backend_go/internal/cache"
 	"github.com/prejudicing/news_py_go/backend_go/internal/config"
+	"github.com/prejudicing/news_py_go/backend_go/internal/model"
 	"github.com/prejudicing/news_py_go/backend_go/internal/server"
 	"github.com/redis/go-redis/v9"
 	"gorm.io/driver/mysql"
@@ -36,6 +37,9 @@ func run() error {
 	db, err := gorm.Open(mysql.Open(cfg.DSN()), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
 	if err != nil {
 		return err
+	}
+	if !db.Migrator().HasTable(&model.RefreshSession{}) {
+		return errors.New("required table refresh_sessions is missing; apply migration 001_refresh_sessions.sql")
 	}
 	sqlDB, err := db.DB()
 	if err != nil {

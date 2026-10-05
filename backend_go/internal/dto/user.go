@@ -18,8 +18,9 @@ type UserInfo struct {
 
 // 定义登录令牌及用户信息响应。
 type AuthResponse struct {
-	Token    string   `json:"token"`
-	UserInfo UserInfo `json:"userInfo"`
+	Token        string   `json:"token"`
+	RefreshToken string   `json:"-"`
+	UserInfo     UserInfo `json:"userInfo"`
 }
 
 // 定义可选的用户资料更新参数。

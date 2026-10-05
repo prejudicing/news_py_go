@@ -3,7 +3,6 @@ package service
 
 import (
 	"context"
-	"errors"
 	"net/http"
 	"time"
 
@@ -12,6 +11,7 @@ import (
 	"github.com/prejudicing/news_py_go/backend_go/internal/dto"
 	"github.com/prejudicing/news_py_go/backend_go/internal/model"
 	"github.com/prejudicing/news_py_go/backend_go/internal/repository"
+	"github.com/prejudicing/news_py_go/backend_go/internal/utils"
 )
 
 // Services 是依赖装配结果，不承载跨领域业务方法。
@@ -26,7 +26,8 @@ type Services struct {
 
 // UserService 处理注册、登录、认证和资料维护。
 type UserService struct {
-	Repo repository.UserRepository
+	Repo      repository.UserRepository
+	JWTSecret []byte
 	clock
 }
 
@@ -72,7 +73,7 @@ func (c clock) now() time.Time {
 // NewServices 构造按领域拆分的服务集合。
 func NewServices(repo *repository.GORMStore, cached *cache.Store, cfg config.Config) *Services {
 	return &Services{
-		User:     NewUserService(repo, cfg.Location),
+		User:     NewUserService(repo, cfg.Location, cfg.JWTSecret),
 		News:     NewNewsService(repo, cached),
 		Favorite: NewFavoriteService(repo, cfg.Location),
 		History:  NewHistoryService(repo, cfg.Location),
@@ -82,8 +83,8 @@ func NewServices(repo *repository.GORMStore, cached *cache.Store, cfg config.Con
 }
 
 // NewUserService 注入用户仓储和业务时区。
-func NewUserService(repo repository.UserRepository, location *time.Location) *UserService {
-	return &UserService{Repo: repo, clock: clock{location: location}}
+func NewUserService(repo repository.UserRepository, location *time.Location, secret string) *UserService {
+	return &UserService{Repo: repo, JWTSecret: []byte(secret), clock: clock{location: location}}
 }
 
 // NewNewsService 注入新闻仓储和缓存。
@@ -146,9 +147,9 @@ func (s *UserService) Authenticate(ctx context.Context, token string) (model.Use
 	if token == "" {
 		return model.User{}, problem(401, "请先登录")
 	}
-	user, err := s.Repo.UserByToken(ctx, token, s.now())
-	if errors.Is(err, repository.ErrNotFound) {
-		return user, problem(401, "无效的令牌或已经过期的令牌")
+	userID, err := utils.ParseJWT(token, s.JWTSecret)
+	if err != nil {
+		return model.User{}, problem(401, "无效的令牌或已经过期的令牌")
 	}
-	return user, err
+	return model.User{ID: userID}, nil
 }

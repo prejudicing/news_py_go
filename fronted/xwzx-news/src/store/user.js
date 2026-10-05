@@ -2,11 +2,14 @@ import { defineStore } from 'pinia';
 import axios from 'axios';
 import { apiConfig } from '../config/api';
 
+const authRequestConfig = { withCredentials: true };
+
 export const useUserStore = defineStore('user', {
   state: () => ({
     userInfo: null,
     token: '',
     isLogin: false,
+    suppressRefreshRestore: false,
     userBio: '这是我的个人简介'
   }),
   
@@ -24,7 +27,7 @@ export const useUserStore = defineStore('user', {
         const response = await axios.post(`${apiConfig.baseURL}/api/user/login`, {
           username: userData.username,
           password: userData.password
-        });
+        }, authRequestConfig);
         
         // 检查响应状态
         if (response.data && response.data.code === 200) {
@@ -35,6 +38,7 @@ export const useUserStore = defineStore('user', {
           this.userInfo = userInfo;
           this.token = token;
           this.isLogin = true;
+          this.suppressRefreshRestore = false;
           
           return {
             success: true,
@@ -62,7 +66,7 @@ export const useUserStore = defineStore('user', {
         const response = await axios.post(`${apiConfig.baseURL}/api/user/register`, {
           username: userData.username,
           password: userData.password
-        });
+        }, authRequestConfig);
         
         // 检查响应状态
         if (response.data && response.data.code === 200) {
@@ -73,6 +77,7 @@ export const useUserStore = defineStore('user', {
           this.userInfo = userInfo;
           this.token = token;
           this.isLogin = true;
+          this.suppressRefreshRestore = false;
           
           return {
             success: true,
@@ -94,7 +99,25 @@ export const useUserStore = defineStore('user', {
       }
     },
     
-    logout() {
+    async logout() {
+      this.suppressRefreshRestore = true;
+      try {
+        await axios.post(`${apiConfig.baseURL}/api/user/logout`, {}, authRequestConfig);
+      } catch (error) {
+        console.warn('退出登录请求失败:', error);
+      }
+      this.userInfo = null;
+      this.token = '';
+      this.isLogin = false;
+    },
+
+    setSession(data) {
+      this.userInfo = data.userInfo || this.userInfo;
+      this.token = data.token || '';
+      this.isLogin = Boolean(this.token);
+    },
+
+    clearSession() {
       this.userInfo = null;
       this.token = '';
       this.isLogin = false;
@@ -237,12 +260,8 @@ export const useUserStore = defineStore('user', {
   
   // 添加持久化配置
   persist: {
-    enabled: true,
-    strategies: [
-      {
-        key: 'user-store',
-        storage: localStorage
-      }
-    ]
+    key: 'user-store',
+    storage: localStorage,
+    pick: ['userInfo', 'isLogin', 'userBio', 'suppressRefreshRestore']
   }
 });
