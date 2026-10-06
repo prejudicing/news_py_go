@@ -17,6 +17,7 @@ import (
 // 取得字符串指针，用于可空字段。
 func str(value string) *string { return &value }
 
+// newSession 同时签发短期 Access JWT 和高熵 Refresh Token。
 func (s *UserService) newSession(uid uint64) (string, string, error) {
 	now := s.now()
 	accessToken, err := utils.IssueJWT(uid, s.JWTSecret, now)
@@ -30,6 +31,7 @@ func (s *UserService) newSession(uid uint64) (string, string, error) {
 	return accessToken, refreshToken, nil
 }
 
+// saveSession 只保存刷新凭据摘要，并确保空闲期限不会超过会话族期限。
 func (s *UserService) saveSession(ctx context.Context, tx repository.UserRepository, uid uint64, familyID, refreshToken string, familyExpiresAt time.Time) error {
 	now := s.now()
 	expiresAt := now.Add(utils.RefreshTokenTTL)
@@ -43,6 +45,7 @@ func (s *UserService) saveSession(ctx context.Context, tx repository.UserReposit
 	return tx.CreateRefreshSession(ctx, &item)
 }
 
+// issueSession 在事务中清理过期记录、锁定用户并创建一条新的设备会话族。
 func (s *UserService) issueSession(ctx context.Context, tx repository.UserRepository, uid uint64) (string, string, error) {
 	if err := tx.PruneExpiredRefreshSessions(ctx, s.now()); err != nil {
 		return "", "", err
@@ -208,6 +211,7 @@ func (s *UserService) UpdateUser(ctx context.Context, user model.User, input dto
 	return PublicUser(user), nil
 }
 
+// UserInfo 查询用户资料并仅返回公开字段。
 func (s *UserService) UserInfo(ctx context.Context, userID uint64) (dto.UserInfo, error) {
 	user, err := s.Repo.UserByID(ctx, userID, false)
 	if err != nil {

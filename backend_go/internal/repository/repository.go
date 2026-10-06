@@ -75,22 +75,27 @@ type HistoryRepository interface {
 // GORMStore 是各领域仓储接口共用的 GORM 实现。
 type GORMStore struct{ db *gorm.DB }
 
+// New 将共享 GORM 连接包装为各领域仓储接口的实现。
 func New(db *gorm.DB) *GORMStore { return &GORMStore{db: db} }
 
+// WithUserTransaction 在同一事务内执行用户和令牌操作。
 func (r *GORMStore) WithUserTransaction(ctx context.Context, fn func(UserRepository) error) error {
 	return r.withTransaction(ctx, func(tx *GORMStore) error { return fn(tx) })
 }
 
+// WithHistoryTransaction 在同一事务内执行浏览历史及其关联数据操作。
 func (r *GORMStore) WithHistoryTransaction(ctx context.Context, fn func(HistoryRepository) error) error {
 	return r.withTransaction(ctx, func(tx *GORMStore) error { return fn(tx) })
 }
 
+// withTransaction 统一绑定请求上下文并转换事务返回的数据库错误。
 func (r *GORMStore) withTransaction(ctx context.Context, fn func(*GORMStore) error) error {
 	return translate(r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		return fn(&GORMStore{db: tx})
 	}))
 }
 
+// Ping 通过底层 database/sql 连接检查 MySQL 是否可达。
 func (r *GORMStore) Ping(ctx context.Context) error {
 	db, err := r.db.DB()
 	if err != nil {
@@ -99,6 +104,7 @@ func (r *GORMStore) Ping(ctx context.Context) error {
 	return db.PingContext(ctx)
 }
 
+// translate 将常见数据库错误映射为不依赖驱动的仓储错误。
 func translate(err error) error {
 	var mysqlErr *driver.MySQLError
 	switch {

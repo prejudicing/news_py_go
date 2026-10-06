@@ -3,6 +3,7 @@ package handler
 
 import "github.com/prejudicing/news_py_go/backend_go/internal/service"
 
+// Handler 持有各领域服务，并负责 HTTP 中间件和响应配置。
 type Handler struct {
 	user           *service.UserService
 	news           *service.NewsService
@@ -14,6 +15,7 @@ type Handler struct {
 	cookieSecure   bool
 }
 
+// New 将应用服务注入 HTTP 层，并设置跨域来源与 Refresh Cookie 安全属性。
 func New(services *service.Services, frontendOrigin string, cookieSecure bool) *Handler {
 	if frontendOrigin == "" {
 		frontendOrigin = "http://127.0.0.1:5173"

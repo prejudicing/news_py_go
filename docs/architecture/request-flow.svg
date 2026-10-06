@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1120" viewBox="0 0 1800 1120" role="img" aria-labelledby="title desc">
+  <title id="title">新闻资讯项目请求处理架构</title>
+  <desc id="desc">展示 Vue 前端请求经过 Gin Handler、Service、Repository 到 MySQL，以及 Redis 缓存和 AI 上游的处理流程。</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 Z" fill="#45627e"/></marker>
+    <marker id="arrow-green" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 Z" fill="#25836b"/></marker>
+    <marker id="arrow-orange" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 Z" fill="#bd6b30"/></marker>
+    <style>
+      .bg{fill:#f5f8fc}.title{font:700 34px 'Microsoft YaHei','Noto Sans CJK SC',sans-serif;fill:#142b43}.sub{font:16px 'Microsoft YaHei','Noto Sans CJK SC',sans-serif;fill:#5b7186}
+      .box{fill:#fff;stroke:#bac9d8;stroke-width:2;rx:18}.blue{fill:#eaf3ff;stroke:#6f9ed3}.teal{fill:#eaf7f3;stroke:#64a993}.purple{fill:#f2edff;stroke:#9b83cb}.amber{fill:#fff3e8;stroke:#d99a62}.dark{fill:#17324d;stroke:#17324d}
+      .head{font:700 21px 'Microsoft YaHei','Noto Sans CJK SC',sans-serif;fill:#17324d}.body{font:16px 'Microsoft YaHei','Noto Sans CJK SC',sans-serif;fill:#334c64}.small{font:14px 'Microsoft YaHei','Noto Sans CJK SC',sans-serif;fill:#536b82}.white{fill:#fff}.line{fill:none;stroke:#45627e;stroke-width:3;marker-end:url(#arrow)}.cacheline{fill:none;stroke:#25836b;stroke-width:3;marker-end:url(#arrow-green)}.a line{stroke:#bd6b30}.ailine{fill:none;stroke:#bd6b30;stroke-width:3;marker-end:url(#arrow-orange)}
+      .label{font:14px 'Microsoft YaHei','Noto Sans CJK SC',sans-serif;fill:#415d77}.pill{fill:#f0f4f8;stroke:#d3dde6;rx:10}
+    </style>
+  </defs>
+  <rect class="bg" width="1800" height="1120"/>
+  <text class="title" x="70" y="66">一条请求如何经过项目后端</text>
+  <text class="sub" x="70" y="98">以已登录用户的普通 API / AI SSE 请求为例；未登录公开接口会跳过认证中间件。</text>
+
+  <!-- Main request path -->
+  <rect class="box blue" x="70" y="185" width="250" height="178"/>
+  <text class="head" x="100" y="224">Vue 前端</text>
+  <text class="body" x="100" y="260">页面 / Store</text>
+  <text class="body" x="100" y="289">Axios / fetch</text>
+  <text class="body" x="100" y="318">JSON 请求或读取 SSE</text>
+
+  <rect class="box blue" x="385" y="185" width="285" height="178"/>
+  <text class="head" x="415" y="224">Gin HTTP 入口</text>
+  <text class="body" x="415" y="260">CORS、Recovery、路由</text>
+  <text class="body" x="415" y="289">参数绑定与校验</text>
+  <text class="body" x="415" y="318">受保护路由执行 JWT 验签</text>
+
+  <rect class="box teal" x="735" y="185" width="250" height="178"/>
+  <text class="head" x="765" y="224">Handler</text>
+  <text class="body" x="765" y="260">HTTP 参数 / Cookie</text>
+  <text class="body" x="765" y="289">调用领域 Service</text>
+  <text class="body" x="765" y="318">统一 JSON 错误或 SSE 转发</text>
+
+  <rect class="box teal" x="1050" y="185" width="310" height="178"/>
+  <text class="head" x="1080" y="224">领域 Service</text>
+  <text class="body" x="1080" y="260">User / News / Favorite</text>
+  <text class="body" x="1080" y="289">History / AI / Health</text>
+  <text class="body" x="1080" y="318">业务规则、事务边界、缓存策略</text>
+
+  <rect class="box purple" x="1425" y="185" width="300" height="178"/>
+  <text class="head" x="1455" y="224">Repository / GORM</text>
+  <text class="body" x="1455" y="260">领域仓储接口实现</text>
+  <text class="body" x="1455" y="289">SQL 查询、锁与事务</text>
+  <text class="body" x="1455" y="318">数据库错误转换</text>
+
+  <path class="line" d="M320 274 H380"/><text class="label" x="326" y="255">HTTP</text>
+  <path class="line" d="M670 274 H730"/><text class="label" x="678" y="255">路由分发</text>
+  <path class="line" d="M985 274 H1045"/><text class="label" x="991" y="255">DTO</text>
+  <path class="line" d="M1360 274 H1420"/><text class="label" x="1366" y="255">仓储接口</text>
+
+  <rect class="box" x="1425" y="485" width="300" height="155"/>
+  <text class="head" x="1455" y="527">MySQL</text>
+  <text class="body" x="1455" y="563">用户、新闻、分类</text>
+  <text class="body" x="1455" y="592">收藏、历史、刷新会话</text>
+  <path class="line" d="M1575 363 V480"/><text class="label" x="1590" y="428">GORM / SQL</text>
+
+  <rect class="box teal" x="1050" y="485" width="310" height="155"/>
+  <text class="head" x="1080" y="527">Redis 缓存</text>
+  <text class="body" x="1080" y="563">新闻列表与分类缓存</text>
+  <text class="body" x="1080" y="592">不可用时回退 MySQL</text>
+  <path class="cacheline" d="M1205 363 V480"/><text class="label" x="1220" y="428">News / Health</text>
+
+  <rect class="box amber" x="735" y="485" width="250" height="155"/>
+  <text class="head" x="765" y="527">OpenAI 兼容 LLM</text>
+  <text class="body" x="765" y="563">请求由 AIService 发起</text>
+  <text class="body" x="765" y="592">上游 SSE 流返回</text>
+  <path class="ailine" d="M1105 363 C1080 425 990 451 900 480"/><text class="label" x="1000" y="435">AIService / HTTP</text>
+  <path class="ailine" d="M735 562 C650 562 610 470 610 368"/><text class="label" x="618" y="490">流式透传至前端</text>
+
+  <!-- Auth detail -->
+  <rect class="box" x="70" y="485" width="570" height="290"/>
+  <text class="head" x="100" y="527">认证路径（受保护 API）</text>
+  <rect class="pill" x="100" y="552" width="500" height="48"/>
+  <text class="body" x="120" y="583">Access JWT：本地验签 / 15 分钟 / 普通请求不查 SQL</text>
+  <rect class="pill" x="100" y="613" width="500" height="48"/>
+  <text class="body" x="120" y="644">Refresh Cookie：HttpOnly，POST /api/user/refresh</text>
+  <rect class="pill" x="100" y="674" width="500" height="48"/>
+  <text class="body" x="120" y="705">哈希、轮换与重放撤销：refresh_sessions 表</text>
+  <path class="line" d="M525 363 C500 418 420 436 360 480"/>
+
+  <!-- Response path and notes -->
+  <rect class="box dark" x="735" y="725" width="990" height="128"/>
+  <text class="head white" x="770" y="770">响应返回</text>
+  <text class="body white" x="900" y="770">普通接口：{code, message, data} JSON</text>
+  <text class="body white" x="900" y="807">AI 对话：Handler 从 AIService 读取上游字节并 Flush 到浏览器，保持 SSE 流式体验</text>
+  <path class="line" d="M735 326 C700 400 700 675 760 720"/>
+  <text class="small" x="70" y="920">分层依赖：handler → service → repository → MySQL；缓存和模型上游由对应 Service 按需访问。</text>
+  <text class="small" x="70" y="950">认证补充：Refresh Token 只在 Cookie 中传输、数据库只保存 SHA-256 摘要；登出撤销当前设备会话族。</text>
+  <text class="small" x="70" y="1015">项目：news_py_go · Go 后端 Gin / GORM / Redis · 按当前代码和 SQL 绘制</text>
+</svg>

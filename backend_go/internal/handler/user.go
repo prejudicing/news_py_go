@@ -37,6 +37,7 @@ func (s *Handler) login(c *gin.Context) {
 	s.respond(c, "登录成功", data, err)
 }
 
+// refresh 从 HttpOnly Cookie 读取凭据并执行轮换；仅认证失败时清除 Cookie。
 func (s *Handler) refresh(c *gin.Context) {
 	cookie, err := c.Cookie("refresh_token")
 	if err != nil {
@@ -57,6 +58,7 @@ func (s *Handler) refresh(c *gin.Context) {
 	s.respond(c, "令牌已刷新", data, err)
 }
 
+// logout 撤销当前设备会话并清除浏览器中的 Refresh Token Cookie。
 func (s *Handler) logout(c *gin.Context) {
 	cookie, _ := c.Cookie("refresh_token")
 	err := s.user.Logout(c.Request.Context(), cookie)
@@ -64,11 +66,13 @@ func (s *Handler) logout(c *gin.Context) {
 	s.respond(c, "已退出登录", nil, err)
 }
 
+// setRefreshCookie 设置不可由前端脚本读取的刷新凭据。
 func (s *Handler) setRefreshCookie(c *gin.Context, value string) {
 	c.SetSameSite(http.SameSiteStrictMode)
 	c.SetCookie("refresh_token", value, int(utils.RefreshTokenTTL.Seconds()), "/api/user", "", s.cookieSecure, true)
 }
 
+// clearRefreshCookie 以相同路径和安全属性删除刷新凭据 Cookie。
 func (s *Handler) clearRefreshCookie(c *gin.Context) {
 	c.SetSameSite(http.SameSiteStrictMode)
 	c.SetCookie("refresh_token", "", -1, "/api/user", "", s.cookieSecure, true)

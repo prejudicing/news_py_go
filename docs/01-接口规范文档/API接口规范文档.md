@@ -12,11 +12,13 @@ http://localhost:8000
 
 ## 认证方式
 
-大部分接口需要认证，认证通过在请求头中添加 `Authorization` 字段实现：
+大部分接口需要认证。访问受保护接口时，在请求头中使用短期 Access JWT：
 
 ```
-Authorization: token值
+Authorization: Bearer <access_token>
 ```
+
+登录或注册成功后，`data.token` 为 Access JWT。Refresh Token 不在 JSON 响应中返回，而由后端通过 `HttpOnly`、`SameSite=Strict` Cookie（`refresh_token`）设置。浏览器请求需携带 Cookie；跨域请求需启用 credentials，并由后端配置对应的 `FRONTEND_ORIGIN`。Access JWT 有效期为 15 分钟；过期后调用 `POST /api/user/refresh`，后端轮换 Refresh Token Cookie 并返回新的 Access JWT。Refresh Token 空闲有效期为 7 天，会话族最长 30 天。退出登录会撤销当前设备的会话。
 
 ## 响应格式
 
@@ -583,3 +585,50 @@ DELETE /api/history/delete/1
   "data": null
 }
 ```
+
+### 认证会话接口
+
+#### 刷新访问令牌
+
+- **接口地址**：`POST /api/user/refresh`
+- **请求参数**：无；浏览器需自动携带 `refresh_token` Cookie。
+- **成功响应**：通用 JSON 格式，`data.token` 是新的 Access JWT；后端通过 `Set-Cookie` 轮换 Refresh Token。
+- **失败响应**：Cookie 缺失、过期或无效时返回 HTTP 401。
+
+#### 退出登录
+
+- **接口地址**：`POST /api/user/logout`
+- **请求参数**：无；浏览器需携带当前 `refresh_token` Cookie。
+- **成功响应**：通用 JSON 格式；撤销当前设备的会话并清除 Cookie。
+
+### AI 对话模块
+
+#### 流式对话
+
+- **接口地址**：`POST /api/ai/chat`
+- **认证**：需要 Access JWT，使用 `Authorization: Bearer <access_token>`。
+- **请求类型**：`application/json`
+- **成功响应类型**：`text/event-stream; charset=utf-8`。这是 SSE 流，不是通用 JSON 包装响应；后端将兼容 OpenAI Chat Completions 格式的上游 SSE 数据流转发给客户端。
+
+请求体中的 `messages` 必须包含 1–50 条消息；每条消息的 `role` 只能是 `user` 或 `assistant`，`content` 最长 20,000 字符。客户端应发送模型需要参考的对话历史（包含本轮 user 消息）。当前服务不保存对话记录，也不返回 conversation ID 或 message ID。
+
+```json
+{
+  "messages": [
+    { "role": "user", "content": "帮我总结这条新闻" },
+    { "role": "assistant", "content": "请提供新闻内容。" },
+    { "role": "user", "content": "新闻内容是……" }
+  ]
+}
+```
+
+成功时上游通常以 `data: {...}\n\n` 发送增量内容，结束时可能发送 `data: [DONE]\n\n`。客户端应逐段读取响应体，并从 OpenAI-compatible chunk 的 `choices[0].delta.content` 提取文本；当前后端透传上游事件，不将其重新包装为 `{code,message,data}`。
+
+认证失败、请求 JSON 错误或上游连接失败等发生在流开始之前时，返回通用 JSON 错误结构和对应 HTTP 状态码。流开始后若读取上游中断，后端发送：
+
+```text
+event: error
+data: {"error":{"message":"AI stream interrupted"}}
+```
+
+客户端应处理非 2xx JSON 错误以及 SSE 流中的错误事件。上游 API Key 由后端从环境配置读取，前端不得传递或保存该密钥。

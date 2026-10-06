@@ -1,0 +1,98 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2100" height="1480" viewBox="0 0 2100 1480" role="img" aria-labelledby="title desc">
+  <title id="title">新闻资讯项目 ER 图与逻辑模型</title>
+  <desc id="desc">展示用户、Refresh Session、新闻分类、新闻、相关新闻、收藏、浏览历史和 AI 聊天表及其外键关系，并标记当前 Go AI 接口尚未持久化对话。</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 Z" fill="#58718a"/></marker>
+    <style>
+      .bg{fill:#f5f8fc}.title{font:700 34px 'Microsoft YaHei','Noto Sans CJK SC',sans-serif;fill:#142b43}.sub{font:16px 'Microsoft YaHei','Noto Sans CJK SC',sans-serif;fill:#5b7186}
+      .entity{fill:#fff;stroke:#9bb0c3;stroke-width:2;rx:14}.active{stroke:#4d8f7b}.legacy{fill:#fffaf3;stroke:#d6a36f;stroke-width:2;rx:14;stroke-dasharray:7 5}
+      .head{font:700 19px 'Microsoft YaHei','Noto Sans CJK SC',sans-serif;fill:#17324d}.field{font:14px 'Consolas','Microsoft YaHei',sans-serif;fill:#304b63}.meta{font:13px 'Microsoft YaHei','Noto Sans CJK SC',sans-serif;fill:#647a8e}.relation{fill:none;stroke:#58718a;stroke-width:2.5;marker-end:url(#arrow)}
+      .label{font:13px 'Microsoft YaHei','Noto Sans CJK SC',sans-serif;fill:#415d77}.panel{fill:#eaf3ff;stroke:#9dbbdb;stroke-width:1.5;rx:16}.paneltitle{font:700 20px 'Microsoft YaHei','Noto Sans CJK SC',sans-serif;fill:#17324d}.panelbody{font:15px 'Microsoft YaHei','Noto Sans CJK SC',sans-serif;fill:#334c64}
+      .badge{fill:#e6f5ef;stroke:#83b7a5;rx:9}.warn{fill:#fff0dc;stroke:#d7a56f;rx:9}.badgeText{font:12px 'Microsoft YaHei','Noto Sans CJK SC',sans-serif;fill:#285b4e}.warnText{font:12px 'Microsoft YaHei','Noto Sans CJK SC',sans-serif;fill:#805321}
+    </style>
+  </defs>
+  <rect class="bg" width="2100" height="1480"/>
+  <text class="title" x="60" y="60">ER 图与逻辑模型</text>
+  <text class="sub" x="60" y="92">实体与约束依据 docs/02-数据库sql文件/database.sql；实线箭头从外键表指向被引用表。</text>
+
+  <!-- Relationships behind entities -->
+  <path class="relation" d="M240 410 V455"/><text class="label" x="255" y="440">user_id · 1:N</text>
+  <path class="relation" d="M720 330 V430"/><text class="label" x="735" y="390">category_id · 1:N</text>
+  <path class="relation" d="M420 350 H500 V725 H555"/><text class="label" x="425" y="710">user_id · 1:N</text>
+  <path class="relation" d="M720 600 V625"/><text class="label" x="735" y="620">news_id · 1:N</text>
+  <path class="relation" d="M60 350 H35 V945 H555"/><text class="label" x="42" y="820">user_id · 1:N</text>
+  <path class="relation" d="M880 520 H920 V830 H720 V845"/><text class="label" x="925" y="810">news_id · 1:N</text>
+  <path class="relation" d="M1390 625 H1325 V530 H885"/><text class="label" x="1080" y="515">news_id · 1:N</text>
+  <path class="relation" d="M1390 750 H1305 V565 H885"/><text class="label" x="1110" y="585">related_news_id · 自关联</text>
+  <path class="relation" d="M240 1130 V1105 H35 V300 H55"/><text class="label" x="42" y="1085">user_id · 1:N</text>
+
+  <!-- User -->
+  <rect class="entity active" x="60" y="150" width="360" height="260"/>
+  <text class="head" x="84" y="184">user · 用户</text><rect class="badge" x="300" y="160" width="96" height="22"/><text class="badgeText" x="310" y="176">Go 当前使用</text>
+  <text class="field" x="84" y="220">PK  id</text><text class="field" x="84" y="245">UQ  username</text><text class="field" x="84" y="270">password</text>
+  <text class="field" x="84" y="295">nickname · avatar · gender</text><text class="field" x="84" y="320">bio · phone (UQ)</text>
+  <text class="field" x="84" y="345">created_at · updated_at</text>
+
+  <!-- Refresh sessions -->
+  <rect class="entity active" x="60" y="460" width="360" height="230"/>
+  <text class="head" x="84" y="494">refresh_sessions · 刷新会话</text><rect class="badge" x="300" y="470" width="96" height="22"/><text class="badgeText" x="310" y="486">Go 当前使用</text>
+  <text class="field" x="84" y="530">PK  id · FK  user_id</text><text class="field" x="84" y="555">family_id · UQ token_hash</text>
+  <text class="field" x="84" y="580">expires_at · family_expires_at</text><text class="field" x="84" y="605">revoked_at · replaced_by_hash</text>
+  <text class="field" x="84" y="630">created_at</text><text class="meta" x="84" y="662">仅保存 Refresh Token SHA-256 摘要及轮换关系</text>
+
+  <!-- Category -->
+  <rect class="entity active" x="560" y="150" width="320" height="180"/>
+  <text class="head" x="584" y="184">news_category · 分类</text><rect class="badge" x="760" y="160" width="96" height="22"/><text class="badgeText" x="770" y="176">Go 当前使用</text>
+  <text class="field" x="584" y="220">PK  id · UQ name</text><text class="field" x="584" y="245">sort_order</text><text class="field" x="584" y="270">created_at · updated_at</text>
+
+  <!-- News -->
+  <rect class="entity active" x="560" y="370" width="320" height="230"/>
+  <text class="head" x="584" y="404">news · 新闻</text><rect class="badge" x="760" y="380" width="96" height="22"/><text class="badgeText" x="770" y="396">Go 当前使用</text>
+  <text class="field" x="584" y="440">PK  id · FK  category_id</text><text class="field" x="584" y="465">title · description · content</text>
+  <text class="field" x="584" y="490">image · author · views</text><text class="field" x="584" y="515">publish_time</text><text class="field" x="584" y="540">created_at · updated_at</text>
+
+  <!-- Favorite -->
+  <rect class="entity active" x="560" y="630" width="320" height="190"/>
+  <text class="head" x="584" y="664">favorite · 收藏</text><rect class="badge" x="760" y="640" width="96" height="22"/><text class="badgeText" x="770" y="656">Go 当前使用</text>
+  <text class="field" x="584" y="700">PK  id · FK  user_id</text><text class="field" x="584" y="725">FK  news_id · created_at</text><text class="field" x="584" y="750">UQ (user_id, news_id)</text>
+
+  <!-- History -->
+  <rect class="entity active" x="560" y="850" width="320" height="190"/>
+  <text class="head" x="584" y="884">history · 浏览历史</text><rect class="badge" x="760" y="860" width="96" height="22"/><text class="badgeText" x="770" y="876">Go 当前使用</text>
+  <text class="field" x="584" y="920">PK  id · FK  user_id</text><text class="field" x="584" y="945">FK  news_id · view_time</text>
+  <text class="meta" x="584" y="980">重复浏览更新现有记录的 view_time</text>
+
+  <!-- Related news self relation -->
+  <rect class="entity active" x="1390" y="570" width="360" height="220"/>
+  <text class="head" x="1414" y="604">related_news · 相关新闻</text><rect class="badge" x="1630" y="580" width="96" height="22"/><text class="badgeText" x="1640" y="596">Go 当前使用</text>
+  <text class="field" x="1414" y="640">PK  id</text><text class="field" x="1414" y="665">FK  news_id</text><text class="field" x="1414" y="690">FK  related_news_id</text>
+  <text class="field" x="1414" y="715">created_at</text><text class="field" x="1414" y="740">UQ (news_id, related_news_id)</text>
+
+  <!-- AI chat legacy/current status -->
+  <rect class="legacy" x="60" y="1130" width="360" height="260"/>
+  <text class="head" x="84" y="1164">ai_chat · AI 聊天记录</text><rect class="warn" x="275" y="1140" width="121" height="22"/><text class="warnText" x="284" y="1156">SQL 有表，Go 未写入</text>
+  <text class="field" x="84" y="1200">PK  id · FK  user_id</text><text class="field" x="84" y="1225">message (用户消息)</text>
+  <text class="field" x="84" y="1250">response (AI 回复)</text><text class="field" x="84" y="1275">created_at</text>
+  <text class="meta" x="84" y="1310">当前 /api/ai/chat 接收前端历史并流式转发；</text><text class="meta" x="84" y="1332">后端不持久化对话，也不返回会话 ID。</text>
+
+  <!-- Logical rules panel -->
+  <rect class="panel" x="960" y="150" width="790" height="340"/>
+  <text class="paneltitle" x="994" y="190">逻辑模型与业务约束</text>
+  <text class="panelbody" x="994" y="230">• 一个用户可拥有多个 Refresh Session；每台设备对应独立 family_id。</text>
+  <text class="panelbody" x="994" y="266">• Refresh Token 只存哈希；轮换保留旧记录用于重放检测。</text>
+  <text class="panelbody" x="994" y="302">• 一个分类包含多条新闻；删除有新闻的分类受 RESTRICT 约束。</text>
+  <text class="panelbody" x="994" y="338">• 用户与新闻通过 favorite 建立多对多关系，(user_id, news_id) 唯一。</text>
+  <text class="panelbody" x="994" y="374">• 用户与新闻通过 history 建立浏览关联；记录有独立 history.id。</text>
+  <text class="panelbody" x="994" y="410">• related_news 以两个外键关联 news，形成新闻到新闻的自关联。</text>
+  <text class="panelbody" x="994" y="446">• user 删除时，其刷新会话、收藏、历史和 AI 记录级联删除。</text>
+
+  <rect class="panel" x="960" y="850" width="790" height="280"/>
+  <text class="paneltitle" x="994" y="890">逻辑关系速览</text>
+  <text class="panelbody" x="994" y="932">User 1 ─ N RefreshSession</text>
+  <text class="panelbody" x="994" y="968">NewsCategory 1 ─ N News</text>
+  <text class="panelbody" x="994" y="1004">User N ─ M News（经 Favorite；用户和新闻组合唯一）</text>
+  <text class="panelbody" x="994" y="1040">User N ─ M News（经 History；每行代表一次/最近一次浏览）</text>
+  <text class="panelbody" x="994" y="1076">News N ─ M News（经 RelatedNews；有方向的关联）</text>
+
+  <text class="meta" x="60" y="1440">说明：图中 FK/唯一约束按数据库初始化 SQL 标注。ai_chat 表定义仍在 SQL 中，但当前 Go AI 聊天链路没有实现历史持久化。</text>
+</svg>

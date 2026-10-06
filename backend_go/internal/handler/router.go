@@ -3,6 +3,7 @@ package handler
 import "github.com/gin-gonic/gin"
 
 // Router 注册中间件和所有 HTTP 路由。
+// Router 注册公共路由，并为需要身份的业务路由挂载认证中间件。
 func (h *Handler) Router() *gin.Engine {
 	r := gin.New()
 	r.Use(gin.Logger(), gin.CustomRecovery(func(c *gin.Context, _ any) { fail(c, 500, "服务器内部错误") }), h.cors())

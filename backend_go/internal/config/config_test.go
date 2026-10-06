@@ -22,6 +22,7 @@ func TestDSNPreservesSpecialPasswordAndTimezone(t *testing.T) {
 	}
 }
 
+// TestLoadRequiresJWTSecret 确认启动配置拒绝缺失或过短的签名密钥。
 func TestLoadRequiresJWTSecret(t *testing.T) {
 	configFile := filepath.Join(t.TempDir(), "empty.env")
 	if err := os.WriteFile(configFile, nil, 0600); err != nil {

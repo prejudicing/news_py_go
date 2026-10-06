@@ -9,14 +9,17 @@ import (
 	"github.com/prejudicing/news_py_go/backend_go/internal/service"
 )
 
+// ok 使用项目统一的成功响应信封。
 func ok(c *gin.Context, message string, data any) {
 	c.JSON(200, gin.H{"code": 200, "message": message, "data": data})
 }
 
+// fail 使用统一错误结构，并中止后续 Gin handler 执行。
 func fail(c *gin.Context, status int, message string) {
 	c.AbortWithStatusJSON(status, gin.H{"code": status, "message": message, "data": nil})
 }
 
+// respond 将业务错误和仓储错误映射为稳定的 HTTP 状态及对外消息。
 func (h *Handler) respond(c *gin.Context, message string, data any, err error) {
 	if err == nil {
 		ok(c, message, data)

@@ -11,6 +11,7 @@ import (
 	"github.com/prejudicing/news_py_go/backend_go/internal/utils"
 )
 
+// refreshMemoryStore 为认证单元测试提供可观察令牌轮换行为的内存仓储。
 type refreshMemoryStore struct {
 	repository.UserRepository
 	user     model.User
@@ -89,6 +90,7 @@ func (r *refreshMemoryStore) PruneExpiredRefreshSessions(_ context.Context, now 
 	return nil
 }
 
+// TestRefreshRotationDetectsReplayAndRevokesOnlyItsFamily 覆盖轮换、重放撤销和设备隔离。
 func TestRefreshRotationDetectsReplayAndRevokesOnlyItsFamily(t *testing.T) {
 	now := time.Now()
 	oldRaw := "original-refresh-secret"

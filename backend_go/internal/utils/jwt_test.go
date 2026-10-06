@@ -10,6 +10,7 @@ import (
 
 const testSecret = "test-only-signing-secret-with-at-least-32-bytes"
 
+// TestJWTSignAndValidate 验证签发令牌可被相同服务策略正常解析。
 func TestJWTSignAndValidate(t *testing.T) {
 	issued := time.Now().UTC()
 	raw, err := IssueJWT(42, []byte(testSecret), issued)
@@ -26,6 +27,7 @@ func TestJWTSignAndValidate(t *testing.T) {
 	}
 }
 
+// TestJWTRejectsTamperingAndExpiry 确认签名篡改及过期令牌均被拒绝。
 func TestJWTRejectsTamperingAndExpiry(t *testing.T) {
 	raw, err := IssueJWT(42, []byte(testSecret), time.Now().Add(-8*24*time.Hour))
 	if err != nil {

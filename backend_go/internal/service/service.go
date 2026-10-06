@@ -63,6 +63,7 @@ type HealthService struct {
 
 type clock struct{ location *time.Location }
 
+// now 使用配置的业务时区生成时间，未配置时区时回退到本地时间。
 func (c clock) now() time.Time {
 	if c.location != nil {
 		return time.Now().In(c.location)
@@ -121,20 +122,26 @@ type Error struct {
 	Message string
 }
 
+// Error 实现 error 接口，供 HTTP 层统一映射业务状态码。
 func (e *Error) Error() string { return e.Message }
 
+// problem 创建可安全映射到 HTTP 响应的业务错误。
 func problem(status int, message string) error { return &Error{Status: status, Message: message} }
 
+// Timestamp 按兼容前端的数据格式序列化时间。
 func Timestamp(value time.Time) string { return value.Format("2006-01-02T15:04:05.999999") }
 
+// PublicUser 投影公开资料字段，避免把密码哈希等内部字段返回给客户端。
 func PublicUser(u model.User) dto.UserInfo {
 	return dto.UserInfo{ID: u.ID, Username: u.Username, Nickname: u.Nickname, Avatar: u.Avatar, Gender: u.Gender, Bio: u.Bio}
 }
 
+// newsDTO 将数据库新闻实体转换为前端接口使用的字段结构。
 func newsDTO(n model.News) dto.NewsItem {
 	return dto.NewsItem{ID: n.ID, Title: n.Title, Description: n.Description, Image: n.Image, Author: n.Author, CategoryID: n.CategoryID, Views: n.Views, PublishTime: Timestamp(n.PublishTime)}
 }
 
+// Health 检查 MySQL 和 Redis 状态；Redis 状态单独报告，不影响 MySQL 可用性判断。
 func (s *HealthService) Health(ctx context.Context) (map[string]any, error) {
 	if err := s.Repo.Ping(ctx); err != nil {
 		return nil, problem(503, "MySQL连接异常")
@@ -143,6 +150,7 @@ func (s *HealthService) Health(ctx context.Context) (map[string]any, error) {
 	return map[string]any{"mysql": "ok", "redis": redisOK, "backend": "go"}, nil
 }
 
+// Authenticate 仅本地验签 Access JWT，不在每个请求上查询令牌表。
 func (s *UserService) Authenticate(ctx context.Context, token string) (model.User, error) {
 	if token == "" {
 		return model.User{}, problem(401, "请先登录")

@@ -12,13 +12,20 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+// issuer 和 audience 限制令牌只接受本服务签发且面向本 API 的 JWT。
 const issuer = "news_py_go"
 const audience = "news_py_go_api"
 
+// AccessTokenTTL 是 Access JWT 的短时有效期，减少被盗令牌可用窗口。
 const AccessTokenTTL = 15 * time.Minute
+
+// RefreshTokenTTL 是刷新令牌的空闲有效期。
 const RefreshTokenTTL = 7 * 24 * time.Hour
+
+// RefreshFamilyTTL 是一台设备会话族允许续期的最长绝对期限。
 const RefreshFamilyTTL = 30 * 24 * time.Hour
 
+// ErrInvalidToken 统一表示不符合本服务策略的访问令牌。
 var ErrInvalidToken = errors.New("invalid JWT")
 
 // IssueJWT 为用户签发短期 HS256 访问令牌。
@@ -69,6 +76,7 @@ func NewRefreshToken() (string, error) {
 	return base64.RawURLEncoding.EncodeToString(raw), nil
 }
 
+// NewRefreshFamilyID 为一台设备的一条刷新令牌轮换链生成随机标识。
 func NewRefreshFamilyID() (string, error) {
 	raw := make([]byte, 16)
 	if _, err := rand.Read(raw); err != nil {

@@ -8,6 +8,7 @@ import (
 	"github.com/prejudicing/news_py_go/backend_go/internal/model"
 )
 
+// cors 只允许配置的前端来源携带 Cookie，其他来源不能读取凭据响应。
 func (h *Handler) cors() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		origin := c.GetHeader("Origin")
@@ -28,6 +29,7 @@ func (h *Handler) cors() gin.HandlerFunc {
 	}
 }
 
+// auth 从 Authorization 请求头验证短期 Access JWT，并将用户写入请求上下文。
 func (h *Handler) auth() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		token := strings.TrimSpace(c.GetHeader("Authorization"))
@@ -44,4 +46,5 @@ func (h *Handler) auth() gin.HandlerFunc {
 	}
 }
 
+// currentUser 读取 auth 中间件已验证并写入上下文的用户。
 func currentUser(c *gin.Context) model.User { return c.MustGet("user").(model.User) }
