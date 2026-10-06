@@ -3,6 +3,7 @@ package handler
 import (
 	"errors"
 	"log"
+	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/prejudicing/news_py_go/backend_go/internal/repository"
@@ -28,7 +29,7 @@ func (h *Handler) respond(c *gin.Context, message string, data any, err error) {
 	var business *service.Error
 	switch {
 	case errors.As(err, &business):
-		fail(c, business.Status, business.Message)
+		fail(c, statusFor(business.Kind), business.Message)
 	case errors.Is(err, repository.ErrNotFound):
 		fail(c, 404, "记录不存在")
 	case errors.Is(err, repository.ErrDuplicate):
@@ -38,5 +39,23 @@ func (h *Handler) respond(c *gin.Context, message string, data any, err error) {
 	default:
 		log.Printf("operation failed: %T", err)
 		fail(c, 500, "数据库操作失败，请稍后重试")
+	}
+}
+
+// statusFor 在 HTTP 边界把业务错误类别转换为协议状态码。
+func statusFor(kind service.ErrorKind) int {
+	switch kind {
+	case service.ErrorInvalidArgument:
+		return http.StatusUnprocessableEntity
+	case service.ErrorUnauthenticated:
+		return http.StatusUnauthorized
+	case service.ErrorNotFound:
+		return http.StatusNotFound
+	case service.ErrorUnavailable:
+		return http.StatusServiceUnavailable
+	case service.ErrorUpstream:
+		return http.StatusBadGateway
+	default:
+		return http.StatusInternalServerError
 	}
 }

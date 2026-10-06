@@ -133,7 +133,7 @@ func TestRefreshRotationDetectsReplayAndRevokesOnlyItsFamily(t *testing.T) {
 
 	_, err = service.Refresh(context.Background(), oldRaw)
 	var business *Error
-	if !errors.As(err, &business) || business.Status != 401 {
+	if !errors.As(err, &business) || business.Kind != ErrorUnauthenticated {
 		t.Fatalf("replayed refresh token should be rejected with 401: %v", err)
 	}
 	if repo.sessions[rotatedHash].RevokedAt == nil {
@@ -142,7 +142,7 @@ func TestRefreshRotationDetectsReplayAndRevokesOnlyItsFamily(t *testing.T) {
 	if repo.sessions[otherHash].RevokedAt != nil {
 		t.Fatal("replay revoked a different device session")
 	}
-	if _, err := service.Refresh(context.Background(), rotated.RefreshToken); !errors.As(err, &business) || business.Status != 401 {
+	if _, err := service.Refresh(context.Background(), rotated.RefreshToken); !errors.As(err, &business) || business.Kind != ErrorUnauthenticated {
 		t.Fatalf("revoked family token should not refresh: %v", err)
 	}
 }

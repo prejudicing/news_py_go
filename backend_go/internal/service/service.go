@@ -3,6 +3,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"time"
 
@@ -116,17 +117,41 @@ func NewHealthService(repo repository.HealthRepository, cached *cache.Store) *He
 	return &HealthService{Repo: repo, Cache: cached}
 }
 
-// Error 表达可安全返回给客户端的业务失败。
+// ErrorKind 标识业务失败类型；传输层根据它决定 HTTP 状态码。
+type ErrorKind string
+
+const (
+	// ErrorInvalidArgument 表示请求在业务规则上不合法。
+	ErrorInvalidArgument ErrorKind = "invalid_argument"
+	// ErrorUnauthenticated 表示缺少有效身份凭据。
+	ErrorUnauthenticated ErrorKind = "unauthenticated"
+	// ErrorNotFound 表示业务资源不存在。
+	ErrorNotFound ErrorKind = "not_found"
+	// ErrorUnavailable 表示本服务或必要依赖当前不可用。
+	ErrorUnavailable ErrorKind = "unavailable"
+	// ErrorUpstream 表示外部模型等上游服务调用失败。
+	ErrorUpstream ErrorKind = "upstream_failure"
+	// ErrorInternal 表示未预期的内部处理失败。
+	ErrorInternal ErrorKind = "internal"
+)
+
+// Error 表达可安全返回给客户端的业务失败，不包含 HTTP 状态码。
 type Error struct {
-	Status  int
+	Kind    ErrorKind
 	Message string
 }
 
 // Error 实现 error 接口，供 HTTP 层统一映射业务状态码。
 func (e *Error) Error() string { return e.Message }
 
-// problem 创建可安全映射到 HTTP 响应的业务错误。
-func problem(status int, message string) error { return &Error{Status: status, Message: message} }
+// problem 创建带有稳定业务类别和安全提示的错误。
+func problem(kind ErrorKind, message string) error { return &Error{Kind: kind, Message: message} }
+
+// IsKind 判断错误链中是否包含指定业务错误类别。
+func IsKind(err error, kind ErrorKind) bool {
+	var business *Error
+	return errors.As(err, &business) && business.Kind == kind
+}
 
 // Timestamp 按兼容前端的数据格式序列化时间。
 func Timestamp(value time.Time) string { return value.Format("2006-01-02T15:04:05.999999") }
@@ -144,7 +169,7 @@ func newsDTO(n model.News) dto.NewsItem {
 // Health 检查 MySQL 和 Redis 状态；Redis 状态单独报告，不影响 MySQL 可用性判断。
 func (s *HealthService) Health(ctx context.Context) (map[string]any, error) {
 	if err := s.Repo.Ping(ctx); err != nil {
-		return nil, problem(503, "MySQL连接异常")
+		return nil, problem(ErrorUnavailable, "MySQL连接异常")
 	}
 	redisOK := s.Cache != nil && s.Cache.Client != nil && s.Cache.Client.Ping(ctx).Err() == nil
 	return map[string]any{"mysql": "ok", "redis": redisOK, "backend": "go"}, nil
@@ -153,11 +178,11 @@ func (s *HealthService) Health(ctx context.Context) (map[string]any, error) {
 // Authenticate 仅本地验签 Access JWT，不在每个请求上查询令牌表。
 func (s *UserService) Authenticate(ctx context.Context, token string) (model.User, error) {
 	if token == "" {
-		return model.User{}, problem(401, "请先登录")
+		return model.User{}, problem(ErrorUnauthenticated, "请先登录")
 	}
 	userID, err := utils.ParseJWT(token, s.JWTSecret)
 	if err != nil {
-		return model.User{}, problem(401, "无效的令牌或已经过期的令牌")
+		return model.User{}, problem(ErrorUnauthenticated, "无效的令牌或已经过期的令牌")
 	}
 	return model.User{ID: userID}, nil
 }

@@ -55,7 +55,7 @@ func (s *NewsService) NewsDetail(ctx context.Context, id uint64) (dto.NewsDetail
 		var err error
 		item, err = s.Repo.NewsByID(ctx, id)
 		if errors.Is(err, repository.ErrNotFound) {
-			return dto.NewsDetail{}, problem(404, "新闻不存在")
+			return dto.NewsDetail{}, problem(ErrorNotFound, "新闻不存在")
 		}
 		if err != nil {
 			return dto.NewsDetail{}, err

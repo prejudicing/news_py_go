@@ -29,7 +29,7 @@ func (s *FavoriteService) RemoveFavorite(ctx context.Context, uid, nid uint64) e
 		return err
 	}
 	if count == 0 {
-		return problem(404, "收藏记录不存在")
+		return problem(ErrorNotFound, "收藏记录不存在")
 	}
 	return nil
 }

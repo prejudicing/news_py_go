@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -49,11 +48,8 @@ func (s *Handler) refresh(c *gin.Context) {
 	data, err := s.user.Refresh(c.Request.Context(), cookie)
 	if err == nil {
 		s.setRefreshCookie(c, data.RefreshToken)
-	} else {
-		var business *service.Error
-		if errors.As(err, &business) && business.Status == http.StatusUnauthorized {
-			s.clearRefreshCookie(c)
-		}
+	} else if service.IsKind(err, service.ErrorUnauthenticated) {
+		s.clearRefreshCookie(c)
 	}
 	s.respond(c, "令牌已刷新", data, err)
 }

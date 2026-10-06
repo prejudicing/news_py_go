@@ -54,7 +54,7 @@ func (s *HistoryService) DeleteHistory(ctx context.Context, uid, id uint64) erro
 		return err
 	}
 	if count == 0 {
-		return problem(404, "历史记录不存在")
+		return problem(ErrorNotFound, "历史记录不存在")
 	}
 	return nil
 }

@@ -71,11 +71,11 @@ func (s *UserService) issueSession(ctx context.Context, tx repository.UserReposi
 // 创建用户并在事务中签发登录令牌。
 func (s *UserService) Register(ctx context.Context, input dto.Credentials) (dto.AuthResponse, error) {
 	if len(input.Password) > 72 {
-		return dto.AuthResponse{}, problem(422, "密码不能超过72字节")
+		return dto.AuthResponse{}, problem(ErrorInvalidArgument, "密码不能超过72字节")
 	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(input.Password), bcrypt.DefaultCost)
 	if err != nil {
-		return dto.AuthResponse{}, problem(500, "密码处理失败")
+		return dto.AuthResponse{}, problem(ErrorInternal, "密码处理失败")
 	}
 	user := model.User{Username: input.Username, Password: string(hash), Avatar: str("https://fastly.jsdelivr.net/npm/@vant/assets/cat.jpeg"), Gender: str("unknown"), Bio: str("这个人很懒，什么都没留下"), CreatedAt: s.now(), UpdatedAt: s.now()}
 	var accessToken, refreshToken string
@@ -103,13 +103,13 @@ func verifyPassword(password, hash string) bool {
 func (s *UserService) Login(ctx context.Context, input dto.Credentials) (dto.AuthResponse, error) {
 	user, err := s.Repo.UserByUsername(ctx, input.Username)
 	if errors.Is(err, repository.ErrNotFound) {
-		return dto.AuthResponse{}, problem(401, "用户名或密码错误")
+		return dto.AuthResponse{}, problem(ErrorUnauthenticated, "用户名或密码错误")
 	}
 	if err != nil {
 		return dto.AuthResponse{}, err
 	}
 	if !verifyPassword(input.Password, user.Password) {
-		return dto.AuthResponse{}, problem(401, "用户名或密码错误")
+		return dto.AuthResponse{}, problem(ErrorUnauthenticated, "用户名或密码错误")
 	}
 	var accessToken, refreshToken string
 	err = s.Repo.WithUserTransaction(ctx, func(tx repository.UserRepository) error {
@@ -123,7 +123,7 @@ func (s *UserService) Login(ctx context.Context, input dto.Credentials) (dto.Aut
 // Refresh 轮换长期凭据并签发新的短期访问令牌。
 func (s *UserService) Refresh(ctx context.Context, raw string) (dto.AuthResponse, error) {
 	if raw == "" {
-		return dto.AuthResponse{}, problem(401, "刷新凭据缺失或已失效")
+		return dto.AuthResponse{}, problem(ErrorUnauthenticated, "刷新凭据缺失或已失效")
 	}
 	var result dto.AuthResponse
 	var rejected bool
@@ -133,7 +133,7 @@ func (s *UserService) Refresh(ctx context.Context, raw string) (dto.AuthResponse
 		}
 		session, err := tx.RefreshSessionByHash(ctx, utils.HashRefreshToken(raw), true)
 		if errors.Is(err, repository.ErrNotFound) {
-			return problem(401, "刷新凭据缺失或已失效")
+			return problem(ErrorUnauthenticated, "刷新凭据缺失或已失效")
 		}
 		if err != nil {
 			return err
@@ -168,7 +168,7 @@ func (s *UserService) Refresh(ctx context.Context, raw string) (dto.AuthResponse
 		return nil
 	})
 	if err == nil && rejected {
-		return dto.AuthResponse{}, problem(401, "刷新凭据已使用、撤销或过期，请重新登录")
+		return dto.AuthResponse{}, problem(ErrorUnauthenticated, "刷新凭据已使用、撤销或过期，请重新登录")
 	}
 	return result, err
 }
@@ -223,18 +223,18 @@ func (s *UserService) UserInfo(ctx context.Context, userID uint64) (dto.UserInfo
 // 验证旧密码并保存新密码哈希。
 func (s *UserService) ChangePassword(ctx context.Context, user model.User, input dto.PasswordRequest) error {
 	if utf8.RuneCountInString(input.New) < 6 || len(input.New) > 72 {
-		return problem(422, "新密码至少6个字符，且不能超过72字节")
+		return problem(ErrorInvalidArgument, "新密码至少6个字符，且不能超过72字节")
 	}
 	currentUser, err := s.Repo.UserByID(ctx, user.ID, false)
 	if err != nil {
 		return err
 	}
 	if !verifyPassword(input.Old, currentUser.Password) {
-		return problem(400, "旧密码错误")
+		return problem(ErrorInvalidArgument, "旧密码错误")
 	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(input.New), bcrypt.DefaultCost)
 	if err != nil {
-		return problem(500, "密码处理失败")
+		return problem(ErrorInternal, "密码处理失败")
 	}
 	return s.Repo.WithUserTransaction(ctx, func(tx repository.UserRepository) error {
 		if err := tx.UpdateUser(ctx, user.ID, map[string]any{"password": string(hash), "updated_at": s.now()}); err != nil {
